@@ -3,12 +3,35 @@ import { useAppContext } from '../context/AppContext';
 import { assets } from './../assets/assets';
 import moment from 'moment';
 import { set } from './../../node_modules/moment/src/lib/moment/get-set';
+import toast from 'react-hot-toast';
 
 const SideBar = ( {isMenuOpen  , setIsMenuOpen }) => {
 
-  const { chats, setSelectedChats, theme, setTheme, user, navigate } = useAppContext();
+  const { chats, setSelectedChat, theme, setTheme, user, navigate, 
+    createNewChat, axios, setChats, fetchUsersChats, setToken , token} = useAppContext();
   const [ search, setSearch ] = useState('')
 
+  const logout = () =>{
+    localStorage.removeItem('token')
+    setToken(null)
+    toast.success('logged out successfully')
+  }
+
+  const deleteChat = async(e, chatId) => {
+    try {
+      e.stopPropagation()
+      const confirm = window.confirm('Are you sure you want to delete this chat?')
+      if(!confirm) return
+      const{data} = await axios.post('/api/chat/delete', {chatId},{headers:{Authorization: token}})
+      if(data.success){
+        setChats(prev => prev.filter(chat => chat._id !== chatId))
+        await fetchUsersChats()
+        toast.success(data.message)
+      }
+    } catch (error) {
+      toast.error(error.message)
+    }
+  }
   return (
     <div className={`flex flex-col justify-between h-screen min-w-60 p-3 
     bg-white dark:bg-gradient-to-b dark:from-[#1a1a1a] dark:to-[#000000]
@@ -22,7 +45,7 @@ const SideBar = ( {isMenuOpen  , setIsMenuOpen }) => {
           className='w-full max-w-36' />
 
         {/* new chat button */}
-        <button className='flex justify-center items-center w-full py-1.5 mt-6 text-xs text-white 
+        <button onClick={createNewChat} className='flex justify-center items-center w-full py-1.5 mt-6 text-xs text-white 
         bg-gradient-to-r from-[#A456F7] to-[#3D81F6] rounded-md cursor-pointer'>
           <span className='mr-1 text-lg'> + </span>New Chat
         </button>
@@ -47,7 +70,7 @@ const SideBar = ( {isMenuOpen  , setIsMenuOpen }) => {
               ? chat.messages[0]?.content.toLowerCase().includes(search.toLowerCase()) 
               : chat.name.toLowerCase().includes(search.toLowerCase()))
               .map((chat) => (
-                <div onClick={() => {navigate('/'); setSelectedChats(chat);setIsMenuOpen(false)}}
+                <div onClick={() => {navigate('/'); setSelectedChat(chat);setIsMenuOpen(false)}}
                 key={chat._id} 
                   className='p-1 px-3 dark:bg-[#57317C]/10 border border-gray-300 dark:border-[#80609F]/15
                   rounded-md cursor-pointer flex justify-between group text-xs'>
@@ -62,7 +85,8 @@ const SideBar = ( {isMenuOpen  , setIsMenuOpen }) => {
                   </div>
                   <img src={assets.bin_icon} 
                     className='hidden group-hover:block w-3 cursor-pointer not-dark:invert' 
-                    alt="" />
+                    alt="" onClick={e => toast.promise(deleteChat(e, chat._id),{loading: 'deleting...'
+                    })}/>
                 </div>
               ))
           }
@@ -116,7 +140,7 @@ const SideBar = ( {isMenuOpen  , setIsMenuOpen }) => {
       {user ? user.name : 'Login your account'}
     </p>
     {user && (
-      <img 
+      <img onClick={logout}
         src={assets.logout_icon} 
         className='h-5 cursor-pointer hidden not-dark:invert group-hover:block' 
         alt="logout" 

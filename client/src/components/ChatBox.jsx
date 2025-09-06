@@ -2,22 +2,52 @@ import React, { useEffect, useState ,useRef} from 'react'
 import { useAppContext } from '../context/AppContext'
 import { assets } from '../assets/assets'
 import Message from './Message'
+import toast from 'react-hot-toast'
 
 const ChatBox = () => {
 
   const containerRef = useRef(null)
 
-  const { selectedChat, theme } = useAppContext()
+  const { selectedChat, theme ,user, axios, token, setUser} = useAppContext()
 
   const [messages, setMessages] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false) // Changed from true to false
 
   const [prompt, setPrompt] = useState('')
   const [mode, setMode] = useState('text')
   const [isPublished, setIsPublished] = useState(false)
 
-  const onSubmit = (e) => {
-    e.preventDefault()
+  const onSubmit = async(e) => {
+   
+    try {
+       e.preventDefault()
+       if(!user) return toast('Login to send message')
+        setLoading(true)
+      const promptCopy = prompt
+      setPrompt('')
+      setMessages(prev => [...prev, {role:'user',content:prompt,timestamp: Date.now(),isImage:false}])
+      const{data} = await axios.post(`/api/message/${mode}`,{chatId:selectedChat._id,prompt, isPublished},{headers : {Authorization: token}})
+
+      if(data.success){
+        setMessages(prev => [...prev, data.reply])
+
+        //decrease credits
+        if(mode === 'image'){
+          setUser(prev => ({...prev, credits:prev.credits - 2}))
+        }else{
+          setUser(prev => ({...prev, credits:prev.credits - 1}))
+        }
+      }else{
+        toast.error(data.message)
+        setPrompt(promptCopy)
+      }
+
+    } catch (error) {
+      toast.error(error.message)
+      setPrompt(promptCopy) // Restore prompt on error
+    }finally{
+      setLoading(false) // Only set loading to false, don't clear prompt again
+    }
   }
 
   useEffect(() => {
@@ -57,16 +87,16 @@ const ChatBox = () => {
           {messages.map((message, index) => (
             <Message key={index} message={message} />
           ))}
+          
+          {/* Three dots loading - inside chat area, right after messages */}
+          {loading && (
+            <div className="loader flex items-center gap-1.5 py-4 px-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-white animate-bounce"></div>
+              <div className="w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-white animate-bounce"></div>
+              <div className="w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-white animate-bounce"></div>
+            </div>
+          )}
         </div>
-
-        {/* Three dots loading */}
-        {loading && (
-          <div className="loader flex items-center gap-1.5 px-4 pb-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-white animate-bounce"></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-white animate-bounce"></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-white animate-bounce"></div>
-          </div>
-        )}
 
 {/* only in image mode */}
 
